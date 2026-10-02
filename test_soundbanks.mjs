@@ -16,7 +16,7 @@ function context() {
     async decodeAudioData(bytes){assert.ok(bytes.byteLength>500);decodes++;return {duration:2};},
   };
 }
-const localFetch = async url => ({ok:true,json:async()=>JSON.parse(await readFile(new URL('./static'+url,import.meta.url),'utf8'))});
+const localFetch = async url => ({ok:true,json:async()=>JSON.parse(await readFile(new URL('./public/'+url.replace(/^\//,''),import.meta.url),'utf8'))});
 
 test('TabIt programs map to distinct guitar, bass, and drum banks',()=>{
   assert.equal(defaultBank({program:30}),'distortion_guitar');

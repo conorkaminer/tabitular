@@ -127,7 +127,7 @@ def midi(song):
         for bar,offset in sequence:
             for note in t['notes']:
                 if note['fret']=='*' or not bar['start']<=note['start']<bar['start']+bar['length']: continue
-                start=offset+note['start']-bar['start']; duration=min(note['duration'],bar['start']+bar['length']-note['start'])
+                start=offset+note['start']-bar['start']; duration=min(note['duration'],sequence[-1][1]+sequence[-1][0]['length']-start)
                 if note.get('muted'): duration=min(duration,0.14)
                 pitch=max(0,min(127,note['pitch']))
                 events.extend([(round(start*120),bytes([0x90|ch,pitch,90])),(round((start+max(.01,duration))*120),bytes([0x80|ch,pitch,0]))])

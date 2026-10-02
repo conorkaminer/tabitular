@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test test_*.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -18,5 +19,6 @@
     "@types/react-dom": "^19.1.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
-  }
+  },
+  "packageManager": "pnpm@11.25.0"
 }

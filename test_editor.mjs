@@ -25,3 +25,14 @@ test('blank tracks and measures are independent',()=>{
  assert.equal(draft.tracks[1].grid[0][0],null);
  assert.equal(newTrack('bass',4).grid[0].length,64);
 });
+
+test('notes ring across blank bars until a stop on the same string',()=>{
+ const draft=newDraft('Let ring',120,4,false);
+ draft.tracks[0].grid[0][12]=0;
+ draft.tracks[0].grid[1][16]=3;
+ draft.tracks[0].grid[0][40]='*';
+ const notes=toSong(draft).tracks[0].notes;
+ assert.equal(notes[0].duration,28);
+ assert.equal(notes[1].duration,48);
+ assert.equal(notes[2].duration,0);
+});

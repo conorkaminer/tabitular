@@ -11,6 +11,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status); self.send_header('Content-Type',kind); self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
     def do_GET(self):
         path=self.path.split('?')[0]
+        if path=='/config.json':
+            self.send(200,json.dumps({'sampleUrl':'api/sample' if self.server.sample else None}).encode(),'application/json'); return
         if path=='/api/sample-midi':
             try: self.send(200,midi(parse(Path(self.server.sample).read_bytes())),'audio/midi')
             except Exception: self.send(400,b'Example unavailable','text/plain')
@@ -21,7 +23,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.startswith('/soundbanks/'):
             filename=path.removeprefix('/soundbanks/')
-            target=ROOT/'static'/'soundbanks'/filename
+            target=ROOT/'public'/'soundbanks'/filename
             if '/' in filename or '\\' in filename or not filename.endswith(('.json','.txt')) or not target.is_file():
                 self.send(404,b'Not found','text/plain'); return
             self.send(200,target.read_bytes(),'application/json' if filename.endswith('.json') else 'text/plain; charset=utf-8'); return

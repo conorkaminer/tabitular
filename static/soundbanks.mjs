@@ -41,7 +41,7 @@ export class SoundbankPlayer {
   async bank(name) {
     if (!BANKS[name]) throw Error('Unknown soundbank: ' + name);
     if (!this.banks.has(name)) {
-      const pending = this.fetcher('/soundbanks/' + name + '.json').then(async response => {
+      const pending = this.fetcher('soundbanks/' + name + '.json').then(async response => {
         if (!response.ok) throw Error('Could not load ' + BANKS[name].label + '. Try again or select the basic synthesizer.');
         const samples = await response.json();
         return { samples, pitches: Object.keys(samples).map(Number) };

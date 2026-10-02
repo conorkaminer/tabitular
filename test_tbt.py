@@ -28,6 +28,18 @@ class Tests(unittest.TestCase):
         self.assertEqual(data[:14],b'MThd'+struct.pack('>IHHH',6,0,1,480))
         self.assertEqual(int.from_bytes(data[18:22],'big'),len(data)-22)
         self.assertIn(b'\x90\x28\x5a',data);self.assertTrue(data.endswith(b'\xff\x2f\x00'))
+    def test_midi_sustains_across_bars_until_rest(self):
+        song=parse(fixture())
+        song['bars']=[dict(start=i*16,length=16,flags=0,repeats=0) for i in range(4)]
+        song['length']=song['tracks'][0]['length']=64
+        song['tracks'][0]['notes']=[
+            dict(start=12,duration=28,fret=0,pitch=40,string=0),
+            dict(start=40,duration=0,fret='*',pitch=0,string=0)]
+        data=midi(song)
+        # From step 12 to the explicit rest at step 40: 28 * 120 MIDI ticks.
+        from tbt import vlq
+        self.assertIn(vlq(12*120)+b'\x90\x28\x5a'+vlq(28*120)+b'\x80\x28\x00',data)
+
     def test_invalid(self):
         for data in [b'',b'not a tab',fixture()[:-4]]:
             with self.assertRaises((ValueError,zlib.error)):parse(data)
