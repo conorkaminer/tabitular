@@ -50,8 +50,12 @@ export async function parse(input, filename = 'Untitled.tbt', editable = false) 
   const tracks=spaces.map((s,i)=>{
     const count=fields.strings[i]; if(count<1||count>8)throw Error('Invalid string count');
     const pitches=standard.map((p,j)=>p+tuning[i][j]+signed(fields.transpose[i]));
-    const times=[0];
-    for(let p=0;p<s;p++){const [a,c]=timing[i].subarray(p*2,p*2+2);times.push(times.at(-1)+(a&&c?a/c:1));}
+    const times=[0];let elapsed=0,correction=0;
+    for(let p=0;p<s;p++){
+      const [a,c]=timing[i].subarray(p*2,p*2+2),increment=(a&&c?a/c:1)-correction,next=elapsed+increment;
+      correction=(next-elapsed)-increment;elapsed=next;
+      times.push(Math.abs(elapsed-Math.round(elapsed))<1e-8?Math.round(elapsed):elapsed);
+    }
     const notes=[];const active=new Map();
     for(let p=0;p<s;p++){
       const row=rawnotes[i].subarray(p*20,p*20+20);
@@ -80,13 +84,45 @@ function runs(raw){
   for(let i=0;i<raw.length;){let j=i+1;while(j<raw.length&&raw[j]===raw[i]&&j-i<255)j++;pairs.push(j-i,raw[i]);i=j;if(pairs.length===65534){chunks.push(concat(number(pairs.length/2,2),pairs));pairs=[];}}
   if(pairs.length)chunks.push(concat(number(pairs.length/2,2),pairs));return concat(...chunks);
 }
+function timingBytes(track) {
+  const raw=new Uint8Array((track.times.length-1)*2);
+  for(let i=0;i<track.times.length-1;i++){
+    const duration=track.times[i+1]-track.times[i];let denominator=1;
+    while(denominator<=255&&Math.abs(duration*denominator-Math.round(duration*denominator))>1e-7)denominator++;
+    const numerator=Math.round(duration*denominator);
+    if(denominator>255||numerator<1||numerator>255)throw Error('This file’s timing cannot be subdivided into triplets.');
+    raw.set([numerator,denominator],i*2);
+  }
+  return runs(raw);
+}
 async function createImportedTbt(draft){
   const {encoding,tracks}=draft;
-  const header=Uint8Array.from(encoding.header),meta=Uint8Array.from(encoding.metadata);
+  const header=Uint8Array.from(encoding.header);let meta=Uint8Array.from(encoding.metadata);
+  let prefix=encoding.prefix,suffix=encoding.suffix,shift=0;
+  if(draft.gridScale===3){
+    const reader=new Reader(Uint8Array.from(suffix));
+    if(header[11]&16)for(const rows of encoding.rawnotes)reader.runs(rows.length/10);
+    const changes=[];
+    if(header[3]>=0x71)for(const track of tracks){
+      const block=new Reader(reader.read(reader.num(4))),records=[];
+      while(block.pos<block.data.length){const delta=block.num(2);records.push(number(delta*3,2),block.read(6));}
+      const bytes=concat(...records);changes.push(number(bytes.length,4),bytes);
+    }
+    suffix=concat(...tracks.map(timingBytes),...changes,reader.read(reader.data.length-reader.pos));
+    if(header[3]===0x6f){
+      shift=tracks.length*4;meta=concat(...tracks.map(t=>number(t.grid[0].length,4)),meta);
+      header[3]=0x70;
+      prefix=concat(...draft.source.bars.map(bar=>concat(number(bar.length,4),[bar.flags,bar.repeats])));
+      header.set(number(draft.source.bars.length,2),40);
+    }else tracks.forEach((track,i)=>meta.set(number(track.grid[0].length,4),i*4));
+    header[11]|=16;
+  }
   const tempo=integer(draft.tempo,30,500,'Tempo');
   if(tracks.length!==header[5])throw Error('Imported track count changed');
   const raw=tracks.map((track,i)=>{
-    const rows=Uint8Array.from(encoding.rawnotes[i]),spaces=rows.length/20;
+    const original=Uint8Array.from(encoding.rawnotes[i]),factor=draft.gridScale===3?3:1;
+    const rows=new Uint8Array(original.length*factor),spaces=rows.length/20;
+    for(let step=0;step<original.length/20;step++)rows.set(original.subarray(step*20,step*20+20),step*factor*20);
     if(track.grid.length!==track.pitches.length)throw Error('Invalid note grid');
     track.grid.forEach((row,string)=>{
       if(row.length!==spaces)throw Error('Invalid imported track length');
@@ -96,13 +132,13 @@ async function createImportedTbt(draft){
         if(fret===null||fret==='*')rows[step*20+8+string]=0;
       });
     });
-    meta[encoding.programOffset+i]=(meta[encoding.programOffset+i]&128)|integer(track.program,0,127,'Instrument');
+    meta[encoding.programOffset+shift+i]=(meta[encoding.programOffset+shift+i]&128)|integer(track.program,0,127,'Instrument');
     // Store the effective tuning, folding the original transpose into each string.
-    meta[encoding.transposeOffset+i]=0;
-    track.pitches.forEach((pitch,j)=>{meta[encoding.tuningOffset+i*8+j]=(integer(pitch,0,127,'Open string pitch')-standard[j])&255;});
+    meta[encoding.transposeOffset+shift+i]=0;
+    track.pitches.forEach((pitch,j)=>{meta[encoding.tuningOffset+shift+i*8+j]=(integer(pitch,0,127,'Open string pitch')-standard[j])&255;});
     return runs(rows);
   });
-  const metadata=await compress(meta),body=concat(encoding.prefix,...raw,encoding.suffix);
+  const metadata=await compress(meta),body=concat(prefix,...raw,suffix);
   const payload=concat(metadata,await compress(body));
   header[4]=Math.min(255,tempo);header.set(number(tempo,2),46);
   header.set(number(metadata.length,4),48);header.set(number(crc32(payload),4),52);
@@ -112,7 +148,7 @@ async function createImportedTbt(draft){
 export async function createTbt(draft){
   if(draft?.encoding)return createImportedTbt(draft);
   if(!draft||typeof draft!=='object'||Array.isArray(draft))throw Error('Expected a score object');
-  const tempo=integer(draft.tempo,30,500,'Tempo'), measures=integer(draft.measures,1,256,'Measure count'), spaces=measures*16;
+  const tempo=integer(draft.tempo,30,500,'Tempo'), measures=integer(draft.measures,1,256,'Measure count'), spaces=measures*16*(draft.gridScale===3?3:1);
   if(!Array.isArray(draft.tracks)||draft.tracks.length<1||draft.tracks.length>15)throw Error('A score needs 1–15 tracks');
   const tracks=draft.tracks.map(t=>{
     if(!t||!Array.isArray(t.pitches)||t.pitches.length<1||t.pitches.length>8)throw Error('A track needs 1–8 strings');
@@ -127,9 +163,9 @@ export async function createTbt(draft){
   const n=tracks.length, repeat=value=>Array(n).fill(value);
   const fields=[tracks.map(t=>t.pitches.length),tracks.map(t=>t.program),repeat(28),repeat(96),repeat(0),repeat(0),repeat(0),repeat(0),repeat(64),repeat(99),tracks.map(t=>+Boolean(t.drums)),tracks.map(t=>t.drums?9:255),repeat(0),repeat(0)];
   const meta=concat(...tracks.map(()=>number(spaces,4)),...fields,...tracks.map(t=>standard.map((p,j)=>((t.pitches[j]??p)-p)&255)),tracks.map(t=>+Boolean(t.drums)),...['title','artist','album','transcriber','comment'].map(k=>stringBytes(draft[k]??'')));
-  const body=concat(...Array.from({length:measures},()=>Uint8Array.of(16,0,0,0,0,0)),...tracks.map(t=>runs(t.raw)));
+  const body=concat(...Array.from({length:measures},()=>Uint8Array.of(16,0,0,0,0,0)),...tracks.map(t=>runs(t.raw)),...(draft.gridScale===3?tracks.map(timingBytes):[]));
   const metadata=await compress(meta), payload=concat(metadata,await compress(body)),header=new Uint8Array(64);
-  header.set([84,66,84,112,Math.min(255,tempo),n,3,50,46,48]);header[11]=11;
+  header.set([84,66,84,112,Math.min(255,tempo),n,3,50,46,48]);header[11]=11|(draft.gridScale===3?16:0);
   header.set(number(measures,2),40);header.set(number(tempo,2),46);
   header.set(number(metadata.length,4),48);header.set(number(crc32(payload),4),52);header.set(number(64+payload.length,4),56);header.set(number(crc32(header.subarray(0,60)),4),60);
   return concat(header,payload);

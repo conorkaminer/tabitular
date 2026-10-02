@@ -99,6 +99,41 @@ test('editing preserves variable bars, fractional timing, repeats, effects and t
   assert.equal(saved.tracks[1].program,33);
   assert.equal(saved.tracks[2].notes[0].pitch,127);
   for(const [i,track] of saved.tracks.entries())assert.deepEqual(toSong(editing).tracks[i].notes,track.notes);
+  const {enableTriplets}=await import('./static/editor.mjs');
+  enableTriplets(editing);
+  const triplets=await parse(await createTbt(editing),'imported.tbt');
+  assert.deepEqual(triplets.tracks[0].changes,saved.tracks[0].changes.map(c=>({...c,space:c.space*3})));
+  assert.equal(triplets.tracks[0].notes[0].effect,'h');
+  assert.deepEqual(midi(triplets),midi(saved));
   const restored=JSON.parse(JSON.stringify(editing));
-  assert.deepEqual(await parse(await createTbt(restored),'imported.tbt'),saved);
+  assert.deepEqual(await parse(await createTbt(restored),'imported.tbt'),triplets);
+});
+
+test('triplet timing round trips through TBT, browser restore and MIDI',async()=>{
+ const {enableTriplets,toSong,fromSong}=await import('./static/editor.mjs');
+ const draft=newDraft('Triplets',120,2,true);draft.tracks[0].grid[0][16]=7;
+ enableTriplets(draft);
+ for(const step of [0,4,8])draft.tracks[0].grid[0][step]=step;
+ draft.tracks[2].grid[0][2]=36;
+ const saved=await parse(await createTbt(draft),'triplets.tbt',true);
+ assert.deepEqual(saved.bars.map(b=>b.start),[0,16]);
+ assert.equal(saved.tracks[0].notes.at(-1).start,16);
+ saved.tracks[0].notes.forEach((note,i)=>assert.ok(Math.abs(note.start-toSong(draft).tracks[0].notes[i].start)<1e-8));
+ assert.deepEqual(midi(saved),midi(toSong(draft)));
+ const restored=JSON.parse(JSON.stringify(draft));
+ assert.deepEqual(await createTbt(restored),await createTbt(draft));
+ const imported=fromSong(saved);enableTriplets(imported);
+ const resaved=await parse(await createTbt(imported),'triplets.tbt');
+ assert.deepEqual(midi(resaved),midi(saved));
+});
+test('triplets can be added to legacy imports while retaining bars and credits',async()=>{
+ const {enableTriplets,fromSong,toSong}=await import('./static/editor.mjs');
+ const bytes=python('import sys;from test_tbt import fixture;sys.stdout.buffer.write(fixture())');
+ const draft=fromSong(await parse(bytes,'legacy.tbt',true));enableTriplets(draft);
+ draft.tracks[0].grid[0][4]=9;
+ const saved=await parse(await createTbt(draft),'legacy.tbt');
+ assert.deepEqual(saved.bars,draft.source.bars);
+ assert.equal(saved.comment,draft.source.comment);
+ assert.ok(Math.abs(saved.tracks[0].notes.find(n=>n.fret===9).start-4/3)<1e-8);
+ assert.deepEqual(midi(saved),midi(toSong(draft)));
 });

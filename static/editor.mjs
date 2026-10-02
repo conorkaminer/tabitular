@@ -54,3 +54,27 @@ export function parseFret(text,maximum=99) {
   if(!/^\d{1,3}$/.test(value)||Number(value)>maximum)throw Error(`Use a note from 0–${maximum}, x to mute, * to stop, or leave blank.`);
   return Number(value);
 }
+
+// Three substeps per original space keep straight notes and triplets on one grid.
+export function enableTriplets(draft) {
+  if(draft.gridScale===3)return;
+  if(draft.tracks.some(track=>track.grid[0].length*3>32000))throw Error('This track is too long to subdivide into triplets.');
+  for(const track of draft.tracks){
+    const times=track.times??Array.from({length:track.grid[0].length+1},(_,i)=>i);
+    const refined=[];
+    for(let i=0;i<times.length-1;i++)for(let j=0;j<3;j++)refined.push(times[i]+(times[i+1]-times[i])*j/3);
+    refined.push(times.at(-1));
+    track.times=refined;
+    track.grid=track.grid.map(row=>row.flatMap(fret=>[fret,null,null]));
+    if(track.notes)track.notes=track.notes.map(note=>({...note,space:note.space*3}));
+    if(track.changes)track.changes=track.changes.map(change=>({...change,space:change.space*3}));
+  }
+  draft.gridScale=3;
+}
+export function gridColumns(draft,index,track,spacing) {
+  const bar=measureGrid(draft,index),times=track.times??Array.from({length:track.grid[0].length+1},(_,i)=>i);
+  return times.slice(0,-1).map((time,step)=>({time,step})).filter(({time,step})=>{
+    const offset=time-bar.start,beat=offset/spacing;
+    return offset>=-1e-8&&offset<bar.length-1e-8&&(Math.abs(beat-Math.round(beat))<1e-8||track.grid.some(row=>row[step]!=null));
+  });
+}

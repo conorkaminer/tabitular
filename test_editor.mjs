@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newDraft, newTrack, toSong, parseFret } from './static/editor.mjs';
+import { newDraft, newTrack, toSong, parseFret, enableTriplets, gridColumns } from './static/editor.mjs';
 
 test('new band contains correctly pitched guitar, bass and GM drums',()=>{
  const draft=newDraft('My riff',140,2,true);
@@ -35,4 +35,19 @@ test('notes ring across blank bars until a stop on the same string',()=>{
  assert.equal(notes[0].duration,28);
  assert.equal(notes[1].duration,48);
  assert.equal(notes[2].duration,0);
+});
+
+test('triplet grids preserve straight notes, support mixed rhythms and remain idempotent',()=>{
+ const draft=newDraft('Triplets',120,2,true);draft.tracks[0].grid[0][4]=7;
+ enableTriplets(draft);enableTriplets(draft);
+ assert.equal(draft.tracks[0].grid[0].length,96);
+ assert.equal(draft.tracks[0].grid[0][12],7);
+ assert.equal(draft.tracks[0].times.at(-1),32);
+ const columns=gridColumns(draft,0,draft.tracks[0],4/3);
+ assert.deepEqual(columns.map(c=>c.step),[0,4,8,12,16,20,24,28,32,36,40,44]);
+ draft.tracks[0].grid[0][4]=3;draft.tracks[0].grid[0][8]=5;
+ const notes=toSong(draft).tracks[0].notes;
+ assert.deepEqual(notes.map(n=>n.start),[4/3,8/3,4]);
+ assert.ok(gridColumns(draft,0,draft.tracks[0],4).some(c=>c.step===4));
+ assert.equal(gridColumns(draft,1,draft.tracks[0],2/3).length,24);
 });

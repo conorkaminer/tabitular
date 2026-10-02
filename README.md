@@ -4,6 +4,8 @@ A React and TypeScript app for viewing `.tbt` files, playing tablature with bund
 
 Choose **All tracks** above the score for a unified view: tracks stack vertically and measures run horizontally with shared bar widths. Zoom, click-to-seek, and draft editing work in either view. Choose **Single track** to return to the individual part.
 
+Choose quarter, eighth, or sixteenth **triplets** from the Compose **Grid** menu. Straight and triplet notes can share a measure; their timing is preserved in playback, browser drafts, `.tbt` downloads, and MIDI exports.
+
 ## Local development
 
 Requires Node.js 22+ and pnpm 11.25.0 (install with `npm install -g pnpm@11.25.0`).
