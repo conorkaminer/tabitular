@@ -4,3 +4,24 @@
 header #new-tab{margin-left:auto}header .button{margin-left:0}dialog{border:1px solid var(--line);border-radius:12px;max-width:470px;width:90%;padding:30px;color:var(--ink);background:var(--paper)}dialog::backdrop{background:#1d281d77}dialog h2{font:500 28px 'Space Grotesk',sans-serif}dialog label{display:block;font-size:12px;margin:16px 0}dialog input,dialog select{display:block;width:100%;margin-top:7px;padding:11px;border:1px solid var(--line);border-radius:5px;background:white}dialog p{font-size:12px;line-height:1.5}.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:25px}#editor{border:1px solid var(--line);border-radius:8px;background:#f6f8f0;padding:16px;margin-bottom:28px}.edit-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}.edit-toolbar strong{margin-right:auto}.edit-toolbar label{font-size:11px}.edit-toolbar button,.edit-toolbar select{font-size:11px;padding:7px;border:1px solid var(--line);border-radius:5px;background:white}#edit-help,#draft-status{font-size:11px;line-height:1.5}.note-grid{overflow:auto}.note-grid table{border-collapse:collapse;width:100%;min-width:620px;table-layout:fixed}.note-grid th{font:10px monospace;color:var(--muted);height:25px}.note-grid th:first-child{width:70px;text-align:left}.note-grid td{padding:2px;border-left:1px solid #e3e6dc}.note-grid .beat-start{border-left:2px solid #a5b59a}.note-grid input,.note-grid button{width:100%;min-width:26px;height:30px;padding:0;text-align:center;font:13px monospace;border:1px solid #d8dfd0;background:white;border-radius:4px;color:var(--green)}.note-grid button[aria-pressed=true]{background:#315c3b;color:white}button:disabled{opacity:.5;cursor:default}@media(max-width:800px){header{gap:10px}header #new-tab{font-size:12px;padding:10px}#editor{padding:10px}}
 
 .zoom-controls{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;color:var(--muted)}.zoom-controls button{padding:5px 10px}.zoom-controls input{width:110px;accent-color:var(--green)}.zoom-controls output{min-width:38px;text-align:center;font-variant-numeric:tabular-nums}#score .system{grid-template-columns:repeat(auto-fill,minmax(var(--measure-width,270px),1fr));min-width:var(--measure-width,270px);gap:var(--system-gap,19.5px) 0;margin-bottom:0}#score .measure{margin-bottom:0}
+
+/* Edit directly on the staff, with one continuous line per string. */
+#editor{border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:0 0 12px;margin-bottom:16px}
+#editor .edit-toolbar{margin-bottom:8px}
+#edit-help,#draft-status{margin:8px 0 0}
+#score .system{display:flex;flex-wrap:wrap;align-items:flex-start;min-width:0;gap:20px 0}
+#score .measure{flex:0 0 auto;max-width:100%;min-width:160px;padding:0 10px 10px}
+#score .measure.editing{background:#f3f7ee;box-shadow:inset 0 2px var(--green);border-radius:0}
+.editing-score{height:22px;visibility:hidden}
+.note-grid{overflow:auto;padding-top:0}
+.note-grid table{min-width:0;width:100%;table-layout:fixed;border-collapse:collapse}
+.note-grid th{height:21px;font:10px monospace}
+.note-grid th:first-child{width:24px;text-align:left}
+.note-grid td,.note-grid .beat-start{border:0;padding:0;height:21px;background:linear-gradient(transparent calc(50% - .5px),#cbd0c5 calc(50% - .5px),#cbd0c5 calc(50% + .5px),transparent calc(50% + .5px))}
+.note-grid input,.note-grid button{display:block;margin:auto;width:24px;min-width:0;height:21px;border:0;border-radius:0;background:transparent;padding:0;font:12px monospace;color:#354630}
+.note-grid input:not(:placeholder-shown){background:#f3f7ee}
+.note-grid input:hover,.note-grid button:hover{background:#e2ead9}
+.note-grid input:focus,.note-grid button:focus-visible{background:white;outline:2px solid #8fa881;outline-offset:0;border-radius:3px}
+.note-grid button[aria-pressed=true]{background:#f3f7ee;color:var(--green)}
+.note-grid caption{text-align:left;font:10px 'DM Sans',system-ui,sans-serif;color:var(--green);height:20px}
+.measure.editing .editing-score{display:none}
