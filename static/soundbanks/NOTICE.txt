@@ -1,0 +1,23 @@
+FluidR3 General MIDI samples
+
+Original Fluid soundfont by Frank Wen and contributors.
+FluidR3_GM.sf2 is distributed under Creative Commons Attribution 3.0:
+https://creativecommons.org/licenses/by/3.0/us/
+
+MP3 rendering and distribution: Michael Gleitz and contributors.
+Percussion-inclusive distribution maintained by Paul Rosen:
+https://github.com/paulrosen/midi-js-soundfonts
+https://github.com/gleitz/midi-js-soundfonts
+
+This application bundles distortion guitar, overdriven guitar, clean electric
+ guitar, fingered electric bass, picked electric bass, and percussion samples.
+The original base64 MP3 data is unchanged. The JavaScript wrappers were removed
+and note-name keys converted to MIDI numbers in declarative JSON files.
+
+Source files:
+https://raw.githubusercontent.com/paulrosen/midi-js-soundfonts/gh-pages/FluidR3_GM/distortion_guitar-mp3.js
+https://raw.githubusercontent.com/paulrosen/midi-js-soundfonts/gh-pages/FluidR3_GM/overdriven_guitar-mp3.js
+https://raw.githubusercontent.com/paulrosen/midi-js-soundfonts/gh-pages/FluidR3_GM/electric_guitar_clean-mp3.js
+https://raw.githubusercontent.com/paulrosen/midi-js-soundfonts/gh-pages/FluidR3_GM/electric_bass_finger-mp3.js
+https://raw.githubusercontent.com/paulrosen/midi-js-soundfonts/gh-pages/FluidR3_GM/electric_bass_pick-mp3.js
+https://raw.githubusercontent.com/paulrosen/midi-js-soundfonts/gh-pages/FluidR3_GM/percussion-mp3.js
