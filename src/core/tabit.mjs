@@ -1,7 +1,7 @@
 import { Reader, concat, number, stringBytes, compress, crc32 } from './binary.mjs';
 const standard = [40,45,50,55,59,64,69,74];
 const signed = x => x > 127 ? x - 256 : x;
-export async function parse(input, filename = 'Untitled.tbt') {
+export async function parse(input, filename = 'Untitled.tbt', editable = false) {
   const data = new Uint8Array(input);
   if (data.length > 5_000_000) throw Error('Choose a .tbt file smaller than 5 MB');
   if (data.length < 64 || String.fromCharCode(...data.subarray(0,3)) !== 'TBT') throw Error('This is not a .tbt file');
@@ -14,7 +14,9 @@ export async function parse(input, filename = 'Untitled.tbt') {
   const spaces = Array.from({length:n}, () => v >= 0x70 ? m.num(4) : header.getUint16(42,true));
   if (spaces.some(s => s < 1 || s > 32000)) throw Error('Invalid track length');
   const names = ['strings','program','mutedProgram','volume',...(v>=0x71?['modulation','pitchBend']:[]),'transpose','bank','reverb','chorus','pan','highest','midiNumbers','channel','top','bottom'];
+  const fieldOffset=m.pos;
   const fields = Object.fromEntries(names.map(name => [name, spaces.map(() => m.num(name==='pitchBend'?2:1))]));
+  const tuningOffset=m.pos;
   const tuning = spaces.map(() => Array.from({length:8}, () => signed(m.num())));
   const drums = spaces.map(() => m.num());
   const info = Object.fromEntries(['title','artist','album','transcriber','comment'].map(key => [key,m.string()]));
@@ -35,7 +37,9 @@ export async function parse(input, filename = 'Untitled.tbt') {
     if(start<raw.length)bars.push({start,length:raw.length-start,flags,repeats:0});
   }
   if(!bars.length)bars.push({start:0,length:spaces[0],flags:0,repeats:0});
+  const notesOffset=b.pos;
   const rawnotes=spaces.map(s=>b.runs(s*20));
+  const notesEnd=b.pos;
   const timing=spaces.map(s=>data[11]&16?b.runs(s*2):new Uint8Array(s*2).fill(1));
   const changes=spaces.map(()=>[]);
   if(v>=0x71)for(const set of changes){
@@ -66,9 +70,9 @@ export async function parse(input, filename = 'Untitled.tbt') {
     for(const c of changes[i])c.start=times[Math.min(c.space,s)];
     if(notes.some(x=>x.effect))warnings.add('String articulations are shown; playback uses the underlying fretted notes.');
     if(changes[i].some(c=>[1,2,9,10].includes(c.effect)))warnings.add('Stroke, modulation and pitch-bend changes are not yet synthesized.');
-    return {index:i,name:(drums[i]?'Drums':'Guitar')+' '+(i+1),strings:count,pitches:pitches.slice(0,count),program:fields.program[i]&127,volume:fields.volume[i],pan:fields.pan[i],drums:Boolean(drums[i]),notes,changes:changes[i],length:times.at(-1)};
+    return {...(editable?{times,cutAll:Boolean(fields.program[i]&128)}:{}),index:i,name:(drums[i]?'Drums':'Guitar')+' '+(i+1),strings:count,pitches:pitches.slice(0,count),program:fields.program[i]&127,volume:fields.volume[i],pan:fields.pan[i],drums:Boolean(drums[i]),notes,changes:changes[i],length:times.at(-1)};
   });
-  return {...info,filename,tempo:header.getUint16(46,true)||data[4],tracks,bars,length:Math.max(...tracks.map(t=>t.length)),warnings:[...warnings].sort()};
+  return {...(editable?{encoding:{header:Array.from(data.subarray(0,64)),metadata:Array.from(m.data),prefix:Array.from(b.data.subarray(0,notesOffset)),suffix:Array.from(b.data.subarray(notesEnd)),rawnotes:rawnotes.map(r=>Array.from(r)),fieldOffset,tuningOffset,programOffset:fieldOffset+n,transposeOffset:fieldOffset+n*(v>=0x71?7:4)}}:{}),...info,filename,tempo:header.getUint16(46,true)||data[4],tracks,bars,length:Math.max(...tracks.map(t=>t.length)),warnings:[...warnings].sort()};
 }
 function integer(value,low,high,name){if(!Number.isInteger(value)||value<low||value>high)throw Error(`${name} must be an integer from ${low} to ${high}`);return value;}
 function runs(raw){
@@ -76,7 +80,37 @@ function runs(raw){
   for(let i=0;i<raw.length;){let j=i+1;while(j<raw.length&&raw[j]===raw[i]&&j-i<255)j++;pairs.push(j-i,raw[i]);i=j;if(pairs.length===65534){chunks.push(concat(number(pairs.length/2,2),pairs));pairs=[];}}
   if(pairs.length)chunks.push(concat(number(pairs.length/2,2),pairs));return concat(...chunks);
 }
+async function createImportedTbt(draft){
+  const {encoding,tracks}=draft;
+  const header=Uint8Array.from(encoding.header),meta=Uint8Array.from(encoding.metadata);
+  const tempo=integer(draft.tempo,30,500,'Tempo');
+  if(tracks.length!==header[5])throw Error('Imported track count changed');
+  const raw=tracks.map((track,i)=>{
+    const rows=Uint8Array.from(encoding.rawnotes[i]),spaces=rows.length/20;
+    if(track.grid.length!==track.pitches.length)throw Error('Invalid note grid');
+    track.grid.forEach((row,string)=>{
+      if(row.length!==spaces)throw Error('Invalid imported track length');
+      row.forEach((fret,step)=>{
+        const offset=step*20+string;
+        rows[offset]=fret===null?0:fret==='x'?17:fret==='*'?18:128+integer(fret,0,127,'Fret / drum note');
+        if(fret===null||fret==='*')rows[step*20+8+string]=0;
+      });
+    });
+    meta[encoding.programOffset+i]=(meta[encoding.programOffset+i]&128)|integer(track.program,0,127,'Instrument');
+    // Store the effective tuning, folding the original transpose into each string.
+    meta[encoding.transposeOffset+i]=0;
+    track.pitches.forEach((pitch,j)=>{meta[encoding.tuningOffset+i*8+j]=(integer(pitch,0,127,'Open string pitch')-standard[j])&255;});
+    return runs(rows);
+  });
+  const metadata=await compress(meta),body=concat(encoding.prefix,...raw,encoding.suffix);
+  const payload=concat(metadata,await compress(body));
+  header[4]=Math.min(255,tempo);header.set(number(tempo,2),46);
+  header.set(number(metadata.length,4),48);header.set(number(crc32(payload),4),52);
+  header.set(number(64+payload.length,4),56);header.set(number(crc32(header.subarray(0,60)),4),60);
+  return concat(header,payload);
+}
 export async function createTbt(draft){
+  if(draft?.encoding)return createImportedTbt(draft);
   if(!draft||typeof draft!=='object'||Array.isArray(draft))throw Error('Expected a score object');
   const tempo=integer(draft.tempo,30,500,'Tempo'), measures=integer(draft.measures,1,256,'Measure count'), spaces=measures*16;
   if(!Array.isArray(draft.tracks)||draft.tracks.length<1||draft.tracks.length>15)throw Error('A score needs 1–15 tracks');

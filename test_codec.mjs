@@ -41,3 +41,64 @@ test('invalid drafts rejected and largest editor grid round trips',async()=>{
   const d=newDraft('Large',120,256,false);d.tracks[0].grid=d.tracks[0].grid.map(row=>row.map((_,i)=>i%25));
   assert.equal((await parse(await createTbt(d))).tracks[0].notes.length,24576);
 });
+
+test('opened legacy files can be edited and saved without losing their metadata or bar layout',async()=>{
+  const {fromSong,toSong}=await import('./static/editor.mjs');
+  const bytes=python('import sys;from test_tbt import fixture;sys.stdout.buffer.write(fixture())');
+  const original=await parse(bytes,'legacy.tbt');
+  const draft=fromSong(await parse(bytes,'legacy.tbt',true));
+  assert.deepEqual(await parse(await createTbt(draft),'legacy.tbt'),original);
+  draft.tracks[0].grid[0][0]=7;draft.tempo=135;
+  const saved=await parse(await createTbt(draft),'legacy.tbt');
+  assert.equal(saved.tracks[0].notes.find(n=>n.space===0&&n.string===0).fret,7);
+  assert.equal(saved.tempo,135);
+  assert.deepEqual(saved.bars,original.bars);
+  assert.equal(saved.comment,original.comment);
+  assert.equal(toSong(draft).tracks[0].notes.find(n=>n.space===0&&n.string===0).fret,7);
+});
+
+test('editing preserves variable bars, fractional timing, repeats, effects and track settings',async()=>{
+  const {Reader,compress,concat,number}=await import('./src/core/binary.mjs');
+  const {fromSong,toSong,measureGrid}=await import('./static/editor.mjs');
+  const draft=newDraft('Imported',120,2,true);
+  draft.tracks[0].grid[0][2]=5;draft.tracks[0].grid[1][8]=7;draft.tracks[0].grid[0][20]='*';
+  draft.tracks[1].grid[0][4]=3;draft.tracks[2].grid[0][0]=36;
+  const bytes=await createTbt(draft),header=bytes.slice(0,64),size=new DataView(header.buffer).getUint32(48,true);
+  const meta=await compress(bytes.subarray(64,64+size),true),body=await compress(bytes.subarray(64+size),true);
+  // Upgrade to 2.0, with modulation and pitch-bend fields and per-track changes.
+  const n=3,insert=4*n+4*n;
+  const metadata=concat(meta.subarray(0,insert),new Uint8Array(3*n),meta.subarray(insert));
+  metadata[4*n+3*n]=78; // guitar volume
+  metadata[4*n+7*n]=2; // transpose
+  metadata[4*n+11*n]=22; // pan
+  header[3]=0x72;header[11]|=16;
+  const r=new Reader(body);r.read(12);
+  function encode(raw){return concat(number(raw.length,2),...Array.from(raw,x=>Uint8Array.of(1,x)));}
+  const rows=Array.from({length:n},()=>r.runs(32*20));
+  rows[0][2*20+8]=104; // hammer-on
+  const bars=concat(number(12,4),[2,0],number(20,4),[4,3]);
+  const timing=Array.from({length:n},()=>encode(Array.from({length:64},(_,i)=>i%2?2:1)));
+  const changes=Array.from({length:n},(_,i)=>i===0?concat(number(8,4),number(4,2),number(3,2),number(0,2),number(155,2)):number(0,4));
+  const packedMeta=await compress(metadata),payload=concat(packedMeta,await compress(concat(bars,...rows.map(encode),...timing,...changes)));
+  header.set(number(packedMeta.length,4),48);
+  const fixture=concat(header,payload),original=await parse(fixture,'imported.tbt');
+  const editing=fromSong(await parse(fixture,'imported.tbt',true));
+  assert.deepEqual(measureGrid(editing,1),{start:12,length:20});
+  assert.deepEqual(await parse(await createTbt(editing),'imported.tbt'),original);
+  editing.tracks[0].grid[0][2]=9;editing.tracks[2].grid[0][0]=127;
+  editing.tracks[1].pitches[0]=26;editing.tracks[1].program=33;
+  const saved=await parse(await createTbt(editing),'imported.tbt');
+  assert.deepEqual(saved.bars,original.bars);
+  assert.deepEqual(saved.tracks[0].changes,original.tracks[0].changes);
+  assert.equal(saved.tracks[0].notes[0].start,1);
+  assert.equal(saved.tracks[0].notes[0].effect,'h');
+  assert.equal(saved.tracks[0].notes[0].fret,9);
+  assert.equal(saved.tracks[0].volume,78);
+  assert.equal(saved.tracks[0].pan,22);
+  assert.equal(saved.tracks[1].pitches[0],26);
+  assert.equal(saved.tracks[1].program,33);
+  assert.equal(saved.tracks[2].notes[0].pitch,127);
+  for(const [i,track] of saved.tracks.entries())assert.deepEqual(toSong(editing).tracks[i].notes,track.notes);
+  const restored=JSON.parse(JSON.stringify(editing));
+  assert.deepEqual(await parse(await createTbt(restored),'imported.tbt'),saved);
+});

@@ -2,6 +2,8 @@
 
 A React and TypeScript app for viewing `.tbt` files, playing tablature with bundled instrument samples, creating scores, and exporting `.tbt` and MIDI files. File processing runs in your browser, so the same build works on GitHub Pages and a local server. Opened files are not uploaded.
 
+Choose **All tracks** above the score for a unified view: tracks stack vertically and measures run horizontally with shared bar widths. Zoom, click-to-seek, and draft editing work in either view. Choose **Single track** to return to the individual part.
+
 ## Local development
 
 Requires Node.js 22+ and pnpm 11.25.0 (install with `npm install -g pnpm@11.25.0`).
@@ -46,7 +48,7 @@ Vite emits relative asset URLs (`base: './'`), so the same `dist` works at `/`, 
 - `src/app-controller.ts`: UI orchestration; `public/`: assets copied into the build.
 - `tbt.py` and `server.py`: optional Python API and local hosting.
 
-Imported files are read-only. New compositions use fixed 4/4 time and one tempo; guitar articulations are displayed but not modeled in playback. Browser drafts are separate for each origin (local and GitHub Pages); download `.tbt` files to move between them.
+Opened files are ready to edit: select a measure, change notes in the grid, and download the edited `.tbt` or MIDI. Imported scores preserve their original bar layout, timing, repeats, metadata, and track settings; adding tracks and measures is available for new compositions. New compositions use fixed 4/4 time and one tempo; guitar articulations are displayed but not modeled in playback. Browser drafts are separate for each origin (local and GitHub Pages); download `.tbt` files to move between them.
 
 ## Tests
 
