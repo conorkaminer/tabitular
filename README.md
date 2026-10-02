@@ -12,7 +12,7 @@ npm run build
 python3 server.py
 ```
 
-For frontend development with hot reload, run `npm run dev` in a second terminal. The Vite development server proxies no API calls; run the Python server on port 8765 as well.
+For frontend development with hot reload, run `python3 server.py` and `npm run dev` in separate terminals. The Vite server proxies API and soundbank requests to the Python server.
 
 Open [localhost:8765](http://127.0.0.1:8765), then load a `.tbt` file or choose
 **New tab**. To preload a sample, run `python3 server.py --sample /path/to/song.tbt`.
