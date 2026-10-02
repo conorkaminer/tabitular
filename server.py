@@ -47,13 +47,13 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path=='/api/parse': self.send(200,json.dumps(song).encode(),'application/json')
             else: self.send(404,b'Not found','text/plain')
         except (ValueError,IndexError,OverflowError) as e: self.send(400,json.dumps({'error':str(e)}).encode(),'application/json')
-        except Exception: self.send(400,b'{"error":"Unable to decode this TabIt file"}','application/json')
+        except Exception: self.send(400,b'{"error":"Unable to decode this .tbt file"}','application/json')
 if __name__=='__main__':
     p=argparse.ArgumentParser(); p.add_argument('--port',type=int,default=8765); p.add_argument('--sample'); args=p.parse_args()
     try:
         http=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
     except OSError as e:
         if e.errno != errno.EADDRINUSE: raise
-        p.exit(1,f'Port {args.port} is already in use. If Tabit is already running, open http://127.0.0.1:{args.port}. Otherwise, choose another port: python3 server.py --port {args.port+1}\n')
+        p.exit(1,f'Port {args.port} is already in use. If tabitular is already running, open http://127.0.0.1:{args.port}. Otherwise, choose another port: python3 server.py --port {args.port+1}\n')
     http.sample=args.sample
-    print(f'Tabit ready at http://127.0.0.1:{args.port}',flush=True); http.serve_forever()
+    print(f'tabitular ready at http://127.0.0.1:{args.port}',flush=True); http.serve_forever()

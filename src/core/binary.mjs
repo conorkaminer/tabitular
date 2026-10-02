@@ -17,7 +17,7 @@ export function stringBytes(value) {
   for (const char of value) {
     let byte = -1;
     for (let i = 0; i < 256; i++) if (decoder.decode(Uint8Array.of(i)) === char) { byte = i; break; }
-    if (byte < 0) throw Error('TabIt titles and credits support Western European characters only');
+    if (byte < 0) throw Error('.tbt file titles and credits support Western European characters only');
     bytes.push(byte);
   }
   if (bytes.length > 65535) throw Error('Credit text is too long');
@@ -26,7 +26,7 @@ export function stringBytes(value) {
 export class Reader {
   constructor(data) { this.data = data; this.pos = 0; }
   read(n) {
-    if (n < 0 || this.pos + n > this.data.length) throw Error('Truncated TabIt data');
+    if (n < 0 || this.pos + n > this.data.length) throw Error('Truncated .tbt file data');
     const result = this.data.subarray(this.pos, this.pos + n); this.pos += n; return result;
   }
   num(n = 1) { return this.read(n).reduce((v, b, i) => v + b * 2 ** (i * 8), 0); }

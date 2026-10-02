@@ -1,10 +1,10 @@
-"""TabIt reader. Format reference: https://bostick.github.io/tabit-file-format/"""
+""".tbt file reader. Format reference: https://bostick.github.io/tabit-file-format/"""
 import struct, zlib
 
 class Reader:
     def __init__(self, data): self.data, self.pos = data, 0
     def read(self,n):
-        if n < 0 or self.pos+n > len(self.data): raise ValueError('Truncated TabIt data')
+        if n < 0 or self.pos+n > len(self.data): raise ValueError('Truncated .tbt file data')
         result=self.data[self.pos:self.pos+n]; self.pos+=n; return result
     def num(self,n=1): return int.from_bytes(self.read(n),'little')
     def string(self): return self.read(self.num(2)).decode('cp1252',errors='replace')
@@ -25,9 +25,9 @@ def inflate(data):
     return out
 
 def parse(data, filename='Untitled.tbt'):
-    if len(data)<64 or data[:3]!=b'TBT': raise ValueError('This is not a TabIt .tbt file')
+    if len(data)<64 or data[:3]!=b'TBT': raise ValueError('This is not a .tbt file')
     v,n=data[3],data[5]
-    if v not in (0x6f,0x70,0x71,0x72): raise ValueError('Supported TabIt formats: 1.6–2.0 (0x6f–0x72). Please resave older files in TabIt 2.03.')
+    if v not in (0x6f,0x70,0x71,0x72): raise ValueError('Supported .tbt file versions: 1.6–2.0 (0x6f–0x72). Please use a file saved in a supported version.')
     if not 1<=n<=15: raise ValueError('Invalid track count')
     u16=lambda p:int.from_bytes(data[p:p+2],'little')
     size=int.from_bytes(data[48:52],'little')
@@ -73,7 +73,7 @@ def parse(data, filename='Untitled.tbt'):
     for i,s in enumerate(spaces):
         count=fields['strings'][i]
         if not 1<=count<=8: raise ValueError('Invalid string count')
-        # TabIt strings are indexed from low to high; shorter instruments use the same E-A-D-G basis.
+        # .tbt file strings are indexed from low to high; shorter instruments use the same E-A-D-G basis.
         pitches=[40,45,50,55,59,64,69,74]
         pitches=[p+tuning[i][j]+signed(fields['transpose'][i]) for j,p in enumerate(pitches)]
         times=[0.0]
@@ -144,7 +144,7 @@ def midi(song):
 
 
 def create_tbt(draft):
-    """Write a new fixed-grid score as TabIt 0x70, with zlib streams and CRCs.
+    """Write a new fixed-grid score as a .tbt file (0x70), with zlib streams and CRCs.
 
     This authoring schema intentionally excludes imported effects/repeats so that
     editing a new score cannot silently discard features in an imported file.
@@ -208,7 +208,7 @@ def create_tbt(draft):
         value = draft.get(key, '')
         if not isinstance(value,str): raise ValueError(f'{key} must be text')
         try: text = value.encode('cp1252')
-        except UnicodeEncodeError: raise ValueError('TabIt titles and credits support Western European characters only')
+        except UnicodeEncodeError: raise ValueError('.tbt file titles and credits support Western European characters only')
         if len(text)>65535: raise ValueError(f'{key} is too long')
         meta += struct.pack('<H',len(text)) + text
     body = bytearray(struct.pack('<IBB',16,0,0)*measures)

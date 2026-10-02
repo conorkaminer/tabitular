@@ -18,7 +18,7 @@ function context() {
 }
 const localFetch = async url => ({ok:true,json:async()=>JSON.parse(await readFile(new URL('./public/'+url.replace(/^\//,''),import.meta.url),'utf8'))});
 
-test('TabIt programs map to distinct guitar, bass, and drum banks',()=>{
+test('.tbt file programs map to distinct guitar, bass, and drum banks',()=>{
   assert.equal(defaultBank({program:30}),'distortion_guitar');
   assert.equal(defaultBank({program:34}),'electric_bass_pick');
   assert.equal(defaultBank({program:33}),'electric_bass_finger');

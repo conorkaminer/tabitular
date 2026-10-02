@@ -4,9 +4,9 @@ const signed = x => x > 127 ? x - 256 : x;
 export async function parse(input, filename = 'Untitled.tbt') {
   const data = new Uint8Array(input);
   if (data.length > 5_000_000) throw Error('Choose a .tbt file smaller than 5 MB');
-  if (data.length < 64 || String.fromCharCode(...data.subarray(0,3)) !== 'TBT') throw Error('This is not a TabIt .tbt file');
+  if (data.length < 64 || String.fromCharCode(...data.subarray(0,3)) !== 'TBT') throw Error('This is not a .tbt file');
   const v = data[3], n = data[5], header = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  if (![0x6f,0x70,0x71,0x72].includes(v)) throw Error('Supported TabIt formats: 1.6–2.0 (0x6f–0x72). Please resave older files in TabIt 2.03.');
+  if (![0x6f,0x70,0x71,0x72].includes(v)) throw Error('Supported .tbt file versions: 1.6–2.0 (0x6f–0x72). Please use a file saved in a supported version.');
   if (n < 1 || n > 15) throw Error('Invalid track count');
   const size = header.getUint32(48,true);
   const m = new Reader(await compress(data.subarray(64,64+size),true));

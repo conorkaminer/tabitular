@@ -1,6 +1,6 @@
-# Tabit
+# tabitular
 
-A React and TypeScript app for viewing TabIt (`.tbt`) files, playing tablature with bundled instrument samples, creating scores, and exporting `.tbt` and MIDI files. File processing runs in your browser, so the same build works on GitHub Pages and a local server. Opened files are not uploaded.
+A React and TypeScript app for viewing `.tbt` files, playing tablature with bundled instrument samples, creating scores, and exporting `.tbt` and MIDI files. File processing runs in your browser, so the same build works on GitHub Pages and a local server. Opened files are not uploaded.
 
 ## Local development
 
@@ -39,7 +39,7 @@ Vite emits relative asset URLs (`base: './'`), so the same `dist` works at `/`, 
 ## Modules
 
 - `src/core/binary.mjs`: bounded compression, binary reading, Windows-1252 text, and checksums.
-- `src/core/tabit.mjs`: browser TabIt 1.6–2.0 reader and fixed-grid writer.
+- `src/core/tabit.mjs`: browser `.tbt` file reader (versions 1.6–2.0) and fixed-grid writer.
 - `src/core/midi.mjs`: MIDI serialization, including repeats and supported effects.
 - `src/core/sample.mjs`: bundled example and optional local sample configuration.
 - `static/editor.mjs` and `static/soundbanks.mjs`: score editing and sample playback.
