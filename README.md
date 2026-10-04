@@ -6,6 +6,8 @@ Choose **All tracks** above the score for a unified view: tracks stack verticall
 
 Choose quarter, eighth, or sixteenth **triplets** from the Compose **Grid** menu. Straight and triplet notes can share a measure; their timing is preserved in playback, browser drafts, `.tbt` downloads, and MIDI exports.
 
+Use **Undo** and **Redo** in the Compose toolbar to restore edits to notes, drums, tempo, tuning, instruments, tracks, and measures. Keyboard shortcuts: **Cmd/Ctrl+Z** to undo, **Cmd/Ctrl+Shift+Z** or **Ctrl+Y** to redo. History keeps the last 100 edits for the current composition and resets when you create, open, or restore a draft. Undo and redo also update the browser-saved draft.
+
 ## Local development
 
 Requires Node.js 22+ and pnpm 11.25.0 (install with `npm install -g pnpm@11.25.0`).
