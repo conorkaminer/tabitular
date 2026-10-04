@@ -66,6 +66,7 @@ export function enableTriplets(draft) {
     refined.push(times.at(-1));
     track.times=refined;
     track.grid=track.grid.map(row=>row.flatMap(fret=>[fret,null,null]));
+    if(track.rawRows)track.rawRows=track.rawRows.flatMap(row=>[row,Array(20).fill(0),Array(20).fill(0)]);
     if(track.notes)track.notes=track.notes.map(note=>({...note,space:note.space*3}));
     if(track.changes)track.changes=track.changes.map(change=>({...change,space:change.space*3}));
   }
@@ -77,4 +78,61 @@ export function gridColumns(draft,index,track,spacing) {
     const offset=time-bar.start,beat=offset/spacing;
     return offset>=-1e-8&&offset<bar.length-1e-8&&(Math.abs(beat-Math.round(beat))<1e-8||track.grid.some(row=>row[step]!=null)||draft.tracks.some(t=>(t.changes??[]).some(c=>c.effect===3&&Math.abs(c.start-time)<1e-8)));
   });
+}
+
+function prepareStructure(draft) {
+  if(draft.structureEdited)return;
+  draft.tracks.forEach((track,index)=>{
+    track.sourceIndex=index;
+    const original=draft.encoding?.rawnotes[index],factor=draft.gridScale===3?3:1;
+    if(original)track.rawRows=Array.from({length:track.grid[0].length},(_,step)=>step%factor===0?original.slice(step/factor*20,step/factor*20+20):Array(20).fill(0));
+  });
+  draft.structureEdited=true;
+}
+export function addTrack(draft,kind) {
+  if(draft.tracks.length>=15)throw Error('A song can have up to 15 tracks.');
+  prepareStructure(draft);
+  const track=newTrack(kind,1),length=toSong(draft).length,scale=draft.gridScale||1;
+  const times=Array.from({length:Math.ceil(length*scale)},(_,i)=>i/scale);times.push(length);
+  track.times=times;track.grid=track.pitches.map(()=>Array(times.length-1).fill(null));track.sourceIndex=-1;
+  draft.tracks.push(track);
+}
+export function changeMeasure(draft,index,remove=false) {
+  if(remove&&draft.measures<=1)throw Error('Keep at least one measure in the song.');
+  if(!remove&&draft.measures>=256)throw Error('A song can have up to 256 measures.');
+  if(index<0||index>(remove?draft.measures-1:draft.measures))throw Error('Invalid measure.');
+  prepareStructure(draft);
+  const song=toSong(draft),bars=song.bars.map(b=>({...b}));
+  const start=bars[index]?.start??bars.at(-1).start+bars.at(-1).length;
+  const length=remove?bars[index].length:(bars[Math.max(0,index-1)]?.length??16),end=start+length;
+  for(const track of draft.tracks){
+    const times=track.times??Array.from({length:track.grid[0].length+1},(_,i)=>i);
+    // Split a timing cell at an edit boundary without moving its existing note.
+    for(const boundary of remove?[start,end]:[start]){
+      if(boundary>times.at(-1)){
+        track.grid.forEach(row=>row.push(null));track.rawRows?.push(Array(20).fill(0));times.push(boundary);
+      }
+      const next=times.findIndex(t=>t>boundary+1e-8);
+      if(next>0&&Math.abs(times[next-1]-boundary)>1e-8){
+        times.splice(next,0,boundary);track.grid.forEach(row=>row.splice(next,0,null));track.rawRows?.splice(next,0,Array(20).fill(0));
+        for(const set of [track.notes,track.changes])for(const item of set??[])if(item.space>=next)item.space++;
+      }
+    }
+    const a=times.findIndex(t=>Math.abs(t-start)<1e-8),b=remove?times.findIndex(t=>Math.abs(t-end)<1e-8):a;
+    const count=remove?0:Math.ceil(length*(draft.gridScale||1)),delta=count-(b-a);
+    track.grid.forEach(row=>row.splice(a,b-a,...Array(count).fill(null)));
+    track.rawRows?.splice(a,b-a,...Array.from({length:count},()=>Array(20).fill(0)));
+    track.times=[...times.slice(0,a),...Array.from({length:count},(_,i)=>start+i*length/count),...times.slice(b).map(t=>t+(remove?-length:length))];
+    for(const key of ['notes','changes'])if(track[key])track[key]=track[key].filter(n=>!remove||n.space<a||n.space>=b).map(n=>{const space=n.space>=b?n.space+delta:n.space;return {...n,space,start:track.times[space]};});
+  }
+  bars.splice(index,remove?1:0,...(remove?[]:[{start,length,flags:0,repeats:0}]));
+  let position=0;for(const bar of bars){bar.start=position;position+=bar.length;}
+  draft.measures=bars.length;draft.source={...draft.source,bars,length:position};
+}
+
+export function removeTrack(draft,index) {
+  if(draft.tracks.length<=1)throw Error('Keep at least one track in the song.');
+  if(!Number.isInteger(index)||index<0||index>=draft.tracks.length)throw Error('Invalid track.');
+  prepareStructure(draft);
+  draft.tracks.splice(index,1);
 }

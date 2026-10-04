@@ -1,6 +1,6 @@
 // @ts-nocheck
 // DOM interaction controller retained during the React UI migration.
-import { DRUMS, newTrack, newDraft, fromSong, measureGrid, toSong, parseFret, enableTriplets, gridColumns } from '../static/editor.mjs';
+import { DRUMS, newTrack, newDraft, fromSong, measureGrid, toSong, parseFret, enableTriplets, gridColumns, addTrack, changeMeasure, removeTrack } from '../static/editor.mjs';
 import { BANKS, defaultBank, SoundbankPlayer } from '../static/soundbanks.mjs';
 import { parse, createTbt } from './core/tabit.mjs';
 import { tempoTimeline, tempoChanges } from './core/tempo.mjs';
@@ -14,8 +14,8 @@ const instrument=t=>BANKS[bankChoices[t.index]||defaultBank(t)]?.label||'MIDI in
 const time=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 function error(e){$('error').textContent=e.message||e;$('error').hidden=false;}
 async function load(data,name){try{const s=await parse(data,name,true);draft=fromSong(s);$('edit-resolution').value='4';editMeasure=0;setup(toSong(draft));persistDraft();$('export').disabled=false;}catch(e){error(e);}}
-function setup(s){stop();song=s;bankChoices=s.tracks.map(()=>null);selected=0;muted=s.tracks.map(()=>false);solo=s.tracks.map(()=>false);gains=s.tracks.map(t=>t.volume/127);$('error').hidden=true;$('empty').hidden=true;$('workspace').hidden=false;$('title').textContent=s.title||s.filename.replace(/\.tbt$/i,'');$('subtitle').textContent=[s.artist||(draft?.source?'Editing your .tbt file':draft?'Your new composition':'From your .tbt collection'),s.bars.length+' measures',s.tracks.length+' tracks'].join('  ·  ');$('tempo').value=s.tempo;$('track-count').textContent=String(s.tracks.length).padStart(2,'0');$('notice').textContent=[draft?'Local FluidR3 samples · Your notes, tuning, tempo and instrument choices are included in .tbt and MIDI downloads. ':'Local FluidR3 samples · Sound choices affect playback; MIDI export keeps the file’s original instruments. ',...s.warnings].join(' ');sequence=[];let begin=0;end=0;s.bars.forEach((bar,i)=>{if(bar.flags&2)begin=i;sequence.push({bar,i,start:end});end+=bar.length;if(bar.flags&4)for(let r=1;r<bar.repeats;r++)for(let j=begin;j<=i;j++){sequence.push({bar:s.bars[j],i:j,start:end});end+=s.bars[j].length;}});timeline=tempoTimeline(song,sequence);$('seek').max=end;renderTracks();renderScore();update();}
-function renderTracks(){$('tracks').replaceChildren();song.tracks.forEach((t,i)=>{const el=document.createElement('div');el.className='track'+(i===selected?' selected':'');el.tabIndex=0;el.setAttribute('role','button');el.setAttribute('aria-label','Show '+instrument(t)+' '+(i+1));el.innerHTML=`<div class="track-top"><span class="track-num">0${i+1}</span><strong>${instrument(t)} ${i+1}</strong></div><small>${t.strings} strings · ${t.drums?'Percussion':t.pitches.map(noteName).join(' ')}</small><button class="${muted[i]?'on':''}" aria-label="Mute track ${i+1}">M</button><button class="${solo[i]?'on':''}" aria-label="Solo track ${i+1}">S</button><input aria-label="Volume track ${i+1}" type="range" min="0" max="1" step="0.01" value="${gains[i]}">`;const select=()=>{selected=i;renderTracks();renderScore();update();};el.onclick=select;el.onkeydown=e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();select();}};el.querySelectorAll('button').forEach((b,j)=>b.onclick=e=>{e.stopPropagation();(j?solo:muted)[i]=!(j?solo:muted)[i];silence();scheduled=position;renderTracks();});const label=document.createElement('label');label.className='sound-label';label.textContent='SOUND';const selectBank=document.createElement('select');selectBank.className='sound-select';selectBank.setAttribute('aria-label','Sound for track '+(i+1));const original=document.createElement('option');original.value='';original.textContent='From file · '+(BANKS[defaultBank(t)]?.label||'Basic synth');selectBank.append(original);for(const [name,bank] of Object.entries(BANKS)){if(Boolean(bank.drums)!==t.drums)continue;const option=document.createElement('option');option.value=name;option.textContent=bank.label;selectBank.append(option);}selectBank.value=bankChoices[i]||'';selectBank.onclick=e=>e.stopPropagation();selectBank.onkeydown=e=>e.stopPropagation();selectBank.onchange=()=>{const resume=playing;position=current();playing=false;playRequest++;loading=false;silence();bankChoices[i]=selectBank.value||null;if(draft){draft.tracks[i].program=BANKS[bankChoices[i]]?.program??draft.tracks[i].program;song.tracks[i].program=draft.tracks[i].program;persistDraft();}renderTracks();renderScore();$('play').textContent='▶ Play';$('play').setAttribute('aria-label','Play');if(resume)start();};label.append(selectBank);el.append(label);el.querySelector('input').onclick=e=>e.stopPropagation();el.querySelector('input').oninput=e=>gains[i]=+e.target.value;$('tracks').append(el);});}
+function setup(s){stop();song=s;bankChoices=s.tracks.map(()=>null);selected=0;muted=s.tracks.map(()=>false);solo=s.tracks.map(()=>false);gains=s.tracks.map(t=>t.volume/127);$('error').hidden=true;$('empty').hidden=true;$('workspace').hidden=false;document.body.classList.add('workspace-open');$('title').textContent=s.title||s.filename.replace(/\.tbt$/i,'');$('subtitle').textContent=[s.artist||(draft?.source?'Editing your .tbt file':draft?'Your new composition':'From your .tbt collection'),s.bars.length+' measures',s.tracks.length+' tracks'].join('  ·  ');$('tempo').value=s.tempo;$('track-count').textContent=String(s.tracks.length).padStart(2,'0');$('notice').textContent=[draft?'Local FluidR3 samples · Your notes, tuning, tempo and instrument choices are included in .tbt and MIDI downloads. ':'Local FluidR3 samples · Sound choices affect playback; MIDI export keeps the file’s original instruments. ',...s.warnings].join(' ');sequence=[];let begin=0;end=0;s.bars.forEach((bar,i)=>{if(bar.flags&2)begin=i;sequence.push({bar,i,start:end});end+=bar.length;if(bar.flags&4)for(let r=1;r<bar.repeats;r++)for(let j=begin;j<=i;j++){sequence.push({bar:s.bars[j],i:j,start:end});end+=s.bars[j].length;}});timeline=tempoTimeline(song,sequence);$('seek').max=end;renderTracks();renderScore();update();}
+function renderTracks(){$('tracks').replaceChildren();song.tracks.forEach((t,i)=>{const el=document.createElement('div');el.className='track'+(i===selected?' selected':'');el.tabIndex=0;el.title=instrument(t)+' '+(i+1);el.setAttribute('aria-pressed',String(i===selected));el.setAttribute('role','button');el.setAttribute('aria-label','Show '+instrument(t)+' '+(i+1));el.innerHTML=`<div class="track-top"><span class="track-num">0${i+1}</span><strong>${instrument(t)} ${i+1}</strong></div><small>${t.strings} strings · ${t.drums?'Percussion':t.pitches.map(noteName).join(' ')}</small><button class="${muted[i]?'on':''}" aria-label="Mute track ${i+1}">M</button><button class="${solo[i]?'on':''}" aria-label="Solo track ${i+1}">S</button><input aria-label="Volume track ${i+1}" type="range" min="0" max="1" step="0.01" value="${gains[i]}">`;const select=()=>{selected=i;renderTracks();renderScore();update();};el.onclick=select;el.onkeydown=e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();select();}};el.querySelectorAll('button').forEach((b,j)=>b.onclick=e=>{e.stopPropagation();(j?solo:muted)[i]=!(j?solo:muted)[i];silence();scheduled=position;renderTracks();});const remove=document.createElement('button');remove.className='remove-track';remove.setAttribute('aria-label','Remove track '+(i+1));remove.title=draft?.tracks.length<=1?'Keep at least one track':'Remove '+instrument(t)+' '+(i+1);remove.disabled=!draft||draft.tracks.length<=1;remove.innerHTML='<img class="control-icon" src="icons/remix/delete-bin-line.svg" alt="" aria-hidden="true">';remove.onclick=e=>{e.stopPropagation();editStructure(()=>{removeTrack(draft,i);muted.splice(i,1);solo.splice(i,1);gains.splice(i,1);bankChoices.splice(i,1);if(selected>i)selected--;else if(selected===i)selected=Math.min(i,draft.tracks.length-1);});};el.querySelector('.track-top').append(remove);const label=document.createElement('label');label.className='sound-label';label.textContent='SOUND';const selectBank=document.createElement('select');selectBank.className='sound-select';selectBank.setAttribute('aria-label','Sound for track '+(i+1));const original=document.createElement('option');original.value='';original.textContent='From file · '+(BANKS[defaultBank(t)]?.label||'Basic synth');selectBank.append(original);for(const [name,bank] of Object.entries(BANKS)){if(Boolean(bank.drums)!==t.drums)continue;const option=document.createElement('option');option.value=name;option.textContent=bank.label;selectBank.append(option);}selectBank.value=bankChoices[i]||'';selectBank.onclick=e=>e.stopPropagation();selectBank.onkeydown=e=>e.stopPropagation();selectBank.onchange=()=>{const resume=playing;position=current();playing=false;playRequest++;loading=false;silence();bankChoices[i]=selectBank.value||null;if(draft){draft.tracks[i].program=BANKS[bankChoices[i]]?.program??draft.tracks[i].program;song.tracks[i].program=draft.tracks[i].program;persistDraft();}renderTracks();renderScore();$('play').textContent='▶ Play';$('play').setAttribute('aria-label','Play');if(resume)start();};label.append(selectBank);el.append(label);el.querySelector('input').onclick=e=>e.stopPropagation();el.querySelector('input').oninput=e=>gains[i]=+e.target.value;$('tracks').append(el);});}
 function renderScore(refreshEditor=true){
   const grid=$('note-grid'),score=$('score');
   grid.hidden=!draft;$('editor').hidden=!draft;$('save-tbt').hidden=!draft;
@@ -108,9 +108,10 @@ function persistDraft(){
   catch{$('draft-status').textContent='Browser storage unavailable. Download .tbt to keep your work.';}
 }
 function rebuildDraft(){
-  const chosen=selected,oldMuted=muted,oldSolo=solo,oldGains=gains;
+  const chosen=selected,oldMuted=muted,oldSolo=solo,oldGains=gains,oldBanks=bankChoices;
   setup(toSong(draft));selected=Math.min(chosen,draft.tracks.length-1);
   muted=muted.map((v,i)=>oldMuted[i]??v);solo=solo.map((v,i)=>oldSolo[i]??v);gains=gains.map((v,i)=>oldGains[i]??v);
+  bankChoices=bankChoices.map((v,i)=>oldBanks[i]??v);
   renderTracks();renderScore();persistDraft();
 }
 function renderEditor(){
@@ -123,7 +124,9 @@ function renderEditor(){
   const standard=track.pitches.every((pitch,i)=>pitch===base[i]);
   const dropD=track.pitches.every((pitch,i)=>pitch===base[i]-(i===0?2:0));
   $('edit-tuning').value=standard?'standard':dropD?'drop-d':'custom';
-  $('add-track').disabled=Boolean(draft.source)||draft.tracks.length>=15;$('add-measure').disabled=Boolean(draft.source)||draft.measures>=256;
+  $('add-track').disabled=draft.tracks.length>=15;
+  $('add-measure').disabled=$('insert-measure').disabled=draft.measures>=256;
+  $('remove-measure').disabled=draft.measures<=1;
   $('edit-help').textContent=track.drums&&!draft.source?'Click a string line to add or remove a drum hit in the selected measure.':track.drums?'Enter MIDI drum notes 0–127 · * = stop · blank = let ring.':'Enter frets 0–99 · x = muted · * = stop · blank = let ring. Edit the selected measure directly; use Grid for finer notes.';
   const bar=measureGrid(draft,editMeasure);
   const resolution=$('edit-resolution').value.split('/').map(Number),spacing=resolution[0]/(resolution[1]||1);const columns=gridColumns(draft,editMeasure,track,spacing);
@@ -176,8 +179,11 @@ $('new-form').onsubmit=e=>{e.preventDefault();$('edit-resolution').value='4';dra
 $('restore-draft').onclick=async()=>{try{const restored=JSON.parse(localStorage.getItem(DRAFT_KEY));await createTbt(restored);draft=restored;$('edit-resolution').value='4';editMeasure=0;selected=0;setup(toSong(draft));$('new-dialog').close();persistDraft();}catch(e){error(e);$('new-dialog').close();}};
 $('edit-measure').onchange=()=>{editMeasure=+$('edit-measure').value;renderScore();update();};
 $('edit-resolution').onchange=()=>{try{if($('edit-resolution').value.includes('/')){enableTriplets(draft);song=toSong(draft);persistDraft();}renderScore();update();}catch(e){error(e);$('edit-resolution').value='4';}};
-$('add-measure').onclick=()=>{if(draft.source||draft.measures>=256)return;draft.measures++;draft.tracks.forEach(t=>{if(t.times){const end=t.times.at(-1);t.times.push(...Array.from({length:16*(draft.gridScale||1)},(_,i)=>end+(i+1)/(draft.gridScale||1)));}});draft.tracks.forEach(t=>t.grid.forEach(row=>row.push(...Array(16*(draft.gridScale||1)).fill(null))));editMeasure=draft.measures-1;rebuildDraft();};
-$('add-track').onclick=()=>{if(draft.source||draft.tracks.length>=15)return;const track=newTrack($('add-kind').value,draft.measures);if(draft.gridScale===3){const temporary={tracks:[track]};enableTriplets(temporary);}draft.tracks.push(track);selected=draft.tracks.length-1;rebuildDraft();};
+function editStructure(action){try{action();rebuildDraft();}catch(e){error(e);}}
+$('add-measure').onclick=()=>editStructure(()=>{changeMeasure(draft,draft.measures);editMeasure=draft.measures-1;});
+$('insert-measure').onclick=()=>editStructure(()=>{changeMeasure(draft,editMeasure+1);editMeasure++;});
+$('remove-measure').onclick=()=>editStructure(()=>{changeMeasure(draft,editMeasure,true);editMeasure=Math.min(editMeasure,draft.measures-1);});
+$('add-track').onclick=()=>editStructure(()=>{addTrack(draft,$('add-kind').value);selected=draft.tracks.length-1;});
 $('edit-tuning').onchange=()=>{const t=draft.tracks[selected],base=t.kind==='bass'?28:40;t.pitches[0]=base-($('edit-tuning').value==='drop-d'?2:0);rebuildDraft();};
 async function draftBytes(){return createTbt(draft);}
 $('save-tbt').onclick=async()=>{try{const bytes=await draftBytes(),url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'})),a=document.createElement('a');a.href=url;a.download=(draft.title.replace(/[\\/:*?"<>|]/g,'_')||'Untitled')+'.tbt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);$('draft-status').textContent='Downloaded .tbt · your draft is also kept in this browser.';}catch(e){error(e);}};
@@ -191,6 +197,18 @@ function setZoom(value){
   $('zoom-out').disabled=zoom===40;
   $('zoom-in').disabled=zoom===200;if(song){renderScore();update();}
 }
+$('toggle-band').onclick=()=>{
+  const minimized=$('workspace').classList.toggle('band-minimized');
+  $('toggle-band').setAttribute('aria-expanded',String(!minimized));
+  $('toggle-band').setAttribute('aria-label',minimized?'Expand band':'Minimize band');
+  $('toggle-band').title=minimized?'Expand band':'Minimize band';
+};
+$('focus-score').onclick=()=>{
+  const focused=document.body.classList.toggle('score-focused');
+  $('focus-score').setAttribute('aria-pressed',String(focused));
+  $('focus-score').setAttribute('aria-label',focused?'Expand top controls':'Minimize top controls');
+  $('focus-score').title=focused?'Expand top controls':'Minimize top controls';
+};
 $('zoom').oninput=e=>setZoom(+e.target.value);
 $('zoom-out').onclick=()=>setZoom(+$('zoom').value-10);
 $('zoom-in').onclick=()=>setZoom(+$('zoom').value+10);
@@ -200,6 +218,12 @@ $('score').addEventListener('wheel',e=>{
   e.preventDefault();
   setZoom(+$('zoom').value+(e.deltaY<0?5:-5));
 },{passive:false});
+document.querySelectorAll('.icon-select select').forEach(select=>{
+  const updateTitle=()=>{select.parentElement.title=select.getAttribute('aria-label')+': '+(select.selectedOptions[0]?.textContent||'');};
+  select.addEventListener('change',updateTitle);
+  new MutationObserver(updateTitle).observe(select,{childList:true});
+  updateTitle();
+});
 setZoom(75);
 
 }

@@ -169,6 +169,7 @@ async function createImportedTbt(draft){
   return concat(header,payload);
 }
 export async function createTbt(draft){
+  if(draft?.structureEdited)return createStructuredTbt(draft);
   if(draft?.encoding)return createImportedTbt(draft);
   if(!draft||typeof draft!=='object'||Array.isArray(draft))throw Error('Expected a score object');
   const tempo=integer(draft.tempo,30,500,'Tempo'), measures=integer(draft.measures,1,256,'Measure count'), spaces=measures*16*(draft.gridScale===3?3:1);
@@ -191,5 +192,38 @@ export async function createTbt(draft){
   header.set([84,66,84,112,Math.min(255,tempo),n,3,50,46,48]);header[11]=11|(draft.gridScale===3?16:0);
   header.set(number(measures,2),40);header.set(number(tempo,2),46);
   header.set(number(metadata.length,4),48);header.set(number(crc32(payload),4),52);header.set(number(64+payload.length,4),56);header.set(number(crc32(header.subarray(0,60)),4),60);
+  return concat(header,payload);
+}
+
+// Structural edits use a modern container with per-track lengths and timing.
+async function createStructuredTbt(draft){
+  const tracks=draft.tracks,n=integer(tracks.length,1,15,'Track count'),tempo=integer(draft.tempo,30,500,'Tempo');
+  const names=['strings','program','mutedProgram','volume','modulation','pitchBend','transpose','bank','reverb','chorus','pan','highest','midiNumbers','channel','top','bottom'];
+  const fields={};
+  if(draft.encoding){
+    const e=draft.encoding,reader=new Reader(Uint8Array.from(e.metadata));reader.pos=e.fieldOffset;
+    for(const name of names){if(e.header[3]<0x71&&['modulation','pitchBend'].includes(name))continue;fields[name]=Array.from({length:e.header[5]},()=>reader.num(name==='pitchBend'?2:1));}
+  }
+  const defaults={mutedProgram:28,volume:96,modulation:0,pitchBend:0,transpose:0,bank:0,reverb:0,chorus:0,pan:64,highest:99,midiNumbers:0,channel:255,top:0,bottom:0};
+  const fieldBytes=names.map(name=>concat(...tracks.map(t=>{
+    const values={strings:t.pitches.length,program:t.program|(t.cutAll?128:0),transpose:0,volume:t.volume??96,pan:t.pan??64,midiNumbers:+t.drums,channel:t.drums?9:255};
+    const value=name in values?values[name]:(fields[name]?.[t.sourceIndex]??defaults[name]);return number(value,name==='pitchBend'?2:1);
+  })));
+  const meta=concat(...tracks.map(t=>number(integer(t.grid[0].length,1,32000,'Track length'),4)),...fieldBytes,...tracks.map(t=>standard.map((p,j)=>((t.pitches[j]??p)-p)&255)),tracks.map(t=>+t.drums),...['title','artist','album','transcriber','comment'].map(k=>stringBytes(draft[k]??draft.source?.[k]??'')));
+  const raw=tracks.map(t=>{
+    const rows=new Uint8Array(t.grid[0].length*20);t.rawRows?.forEach((r,i)=>rows.set(r,i*20));
+    // Track changes are emitted below, not duplicated as legacy row effects.
+    for(let i=0;i<t.grid[0].length;i++)rows.fill(0,i*20+16,i*20+20);
+    t.grid.forEach((row,string)=>row.forEach((fret,step)=>{
+      rows[step*20+string]=fret===null?0:fret==='x'?17:fret==='*'?18:128+integer(fret,0,127,'Fret / drum note');
+      if(fret===null||fret==='*')rows[step*20+8+string]=0;
+    }));return runs(rows);
+  });
+  const changes=tracks.map(t=>{let previous=0;const bytes=concat(...[...(t.changes??[])].sort((a,b)=>a.space-b.space).map(c=>{const delta=c.space-previous;previous=c.space;return concat(number(delta,2),number(c.effect,2),number(0,2),number(c.value,2));}));return concat(number(bytes.length,4),bytes);});
+  const bars=draft.source?.bars??Array.from({length:draft.measures},()=>({length:16,flags:0,repeats:0}));
+  const metadata=await compress(meta),body=concat(...bars.map(b=>concat(number(b.length,4),[b.flags,b.repeats])),...raw,...tracks.map(t=>timingBytes({...t,times:t.times??Array.from({length:t.grid[0].length+1},(_,i)=>i)})),...changes);
+  const payload=concat(metadata,await compress(body)),header=new Uint8Array(64);
+  header.set([84,66,84,113,Math.min(255,tempo),n,3,50,46,48]);header[11]=27;
+  header.set(number(bars.length,2),40);header.set(number(tempo,2),46);header.set(number(metadata.length,4),48);header.set(number(crc32(payload),4),52);header.set(number(64+payload.length,4),56);header.set(number(crc32(header.subarray(0,60)),4),60);
   return concat(header,payload);
 }

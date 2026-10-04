@@ -42,3 +42,139 @@ header #new-tab{margin-left:auto}header .button{margin-left:0}dialog{border:1px 
 @media(max-width:800px){.score-options{align-items:flex-start}.score-track-label{font-size:11px}}
 .note-grid input[type=number]{width:32px;font-size:11px;appearance:textfield;-moz-appearance:textfield}
 .note-grid input[type=number]::-webkit-inner-spin-button,.note-grid input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+/* Let the score use the available window, with independently scrolling panels. */
+body.workspace-open{height:100dvh;overflow:hidden}
+.workspace-open #root,.workspace-open #root>div{height:100%;min-height:0}
+.workspace-open #root>div{display:flex;flex-direction:column}
+.workspace-open header{height:56px;flex-shrink:0;padding:0 20px;gap:20px}
+.workspace-open .brand{font-size:28px}
+.workspace-open header button,.workspace-open header .button{padding:7px 12px}
+.workspace-open main{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:none;margin:0;padding:0 16px 12px}
+.workspace-open .intro{padding:12px 4px;flex-shrink:0}
+.workspace-open .intro .eyebrow,.workspace-open .file-mark,.workspace-open footer{display:none}
+.workspace-open h1{font-size:24px;letter-spacing:-.7px;margin:0;overflow-wrap:anywhere}
+.workspace-open #subtitle{font-size:12px;margin:4px 0 0}
+#workspace{min-height:0}
+.workspace-open #workspace{display:flex;flex-direction:column;flex:1}
+.workspace-open .transport{position:static;flex-shrink:0;padding:8px;gap:10px;flex-wrap:wrap}
+.workspace-open .transport button{padding:7px 10px}
+.workspace-open .layout{flex:1;min-height:0;grid-template-columns:210px minmax(0,1fr);margin-top:10px}
+.workspace-open aside{min-height:0;overflow:auto;padding:16px 10px}
+.workspace-open article{display:flex;flex-direction:column;min-height:0;overflow:auto;padding:14px 18px}
+.workspace-open .score-head{margin-bottom:10px;flex-shrink:0}
+.workspace-open .score-head h2{font-size:17px;margin:4px 0}
+.workspace-open .score-options{flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px}
+.workspace-controls{display:flex;gap:6px}
+.workspace-controls button{font-size:12px;padding:7px 10px}
+#focus-score[aria-pressed=true]{background:var(--green);color:white}
+.workspace-open #editor{margin-bottom:8px;padding-bottom:8px;flex-shrink:0}
+.compose-settings summary{font-size:11px;color:var(--muted);cursor:pointer;padding:4px 0}
+.compose-settings[open] summary{margin-bottom:8px}
+.compose-settings p{font-size:11px}
+#draft-status:empty{display:none}
+.workspace-open .zoom-controls{margin-bottom:8px;flex-shrink:0}
+.workspace-open #score,.workspace-open #score.unified{flex:1;min-height:120px;max-height:none;overflow:auto;overscroll-behavior:contain}
+.workspace-open #notice{flex-shrink:0;margin:6px 2px 0;font-size:10px;max-height:34px;overflow:auto}
+
+.score-focused header,.score-focused .intro,.score-focused #tuning{display:none}
+.score-focused main{padding-top:10px}
+@media(max-width:800px){
+ .workspace-open header{padding:0 12px;gap:8px}
+ .workspace-open main{padding-left:8px;padding-right:8px}
+ .workspace-open .layout{grid-template-columns:160px minmax(0,1fr)}
+ .workspace-open #tracks{display:block;overflow:visible}
+ .workspace-open .track{min-width:0;padding:10px 5px}
+ .workspace-open article{padding:10px}
+ .workspace-open .score-options{align-items:flex-start}
+}
+@media(max-width:540px){
+ .workspace-open .layout{grid-template-columns:minmax(0,1fr)}
+ .workspace-open aside{max-height:150px;padding:8px}
+ .workspace-open #tracks{display:flex;overflow:auto}
+ .workspace-open .track{min-width:170px;margin-bottom:0}
+ .workspace-open aside .section-label,.workspace-open .output{display:none}
+ .workspace-open .layout{grid-template-rows:auto minmax(0,1fr)}
+
+ .workspace-open .intro{padding:8px 4px}
+}
+
+/* Keep track navigation available when the band is minimized. */
+.band-heading{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.band-heading .section-label{flex:1;padding:0 0 0 10px;gap:10px}
+#toggle-band{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:32px;height:32px;padding:5px;color:var(--green)}
+.workspace-open .band-minimized .layout{grid-template-columns:64px minmax(0,1fr)}
+.workspace-open .band-minimized aside{padding:16px 8px}
+.band-minimized .band-heading{justify-content:center}
+.band-minimized .band-heading .section-label,.band-minimized .output,.band-minimized .track strong,.band-minimized .track small,.band-minimized .track button,.band-minimized .track input,.band-minimized .sound-label{display:none}
+.band-minimized #toggle-band svg{transform:rotate(180deg)}
+.workspace-open .band-minimized .track{min-width:0;padding:14px 4px;text-align:center}
+.band-minimized .track-top{justify-content:center}
+.band-minimized .track.selected .track-num{color:var(--green);font-weight:bold}
+@media(max-width:540px){
+ .band-heading{margin-bottom:6px}
+ .workspace-open .band-minimized .layout{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+ .workspace-open .band-minimized aside{display:flex;align-items:center;gap:8px;padding:8px;max-height:none}
+ .band-minimized .band-heading{margin:0;flex-shrink:0}
+ .workspace-open .band-minimized #tracks{gap:6px;min-width:0}
+ .workspace-open .band-minimized .track{min-width:40px;padding:9px 4px}
+
+}
+
+
+
+/* Compact composition controls retain the same native inputs and actions. */
+.control-icon{width:18px;height:18px;flex-shrink:0;display:block}
+.icon-control,.edit-toolbar .icon-select{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+#focus-score{margin-left:0}
+#focus-score[aria-pressed=true]{background:#e8edde;color:var(--green)}
+#focus-score[aria-pressed=true] .control-icon{transform:rotate(180deg)}
+.edit-toolbar .icon-select{position:relative}
+.score-focused .control-text,.score-focused .compose-settings,.score-focused #draft-status{display:none}
+.score-focused #editor .edit-toolbar{gap:8px;margin:0}
+.score-focused .icon-control,.score-focused .edit-toolbar .icon-select{width:34px;height:34px;padding:7px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
+.score-focused .icon-select select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.score-focused .icon-select:focus-within{outline:3px solid #8fa881;outline-offset:3px}
+.score-focused .icon-select:has(select:disabled){opacity:.5}
+.score-focused .icon-select:hover{background:#e8edde}
+.score-focused .score-head .eyebrow{display:none}
+
+/* Track creation and removal live together in the band sidebar. */
+.track-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.track-kind{display:flex;align-items:center;gap:5px;min-width:0;flex:1}
+.track-kind select{width:100%;min-width:0;padding:7px 3px;font-size:11px;border:1px solid var(--line);border-radius:5px;background:var(--paper);color:var(--ink)}
+.track-actions #add-track{width:100%;height:32px;padding:6px;font-size:11px}
+.track-top strong{min-width:0;flex:1}
+.track .remove-track{display:flex;align-items:center;justify-content:center;margin:0 0 0 auto;padding:4px;flex-shrink:0;border:0;color:var(--muted)}
+.track .remove-track .control-icon{width:15px;height:15px}
+.track .remove-track:hover:not(:disabled){background:#f8e4df}
+.band-minimized .track-actions{justify-content:center}
+.band-minimized .track-kind{position:relative;flex:none;width:32px;height:32px;justify-content:center;border:1px solid var(--line);border-radius:5px}
+.band-minimized .track-kind select{position:absolute;inset:0;opacity:0;cursor:pointer}
+.band-minimized .track-kind:focus-within{outline:3px solid #8fa881;outline-offset:3px}
+.band-minimized .track-action-text{display:none}
+.band-minimized .track-actions #add-track{width:32px}
+.band-minimized .track-top{flex-direction:column;gap:6px}
+.band-minimized .track .remove-track{display:flex;margin:0}
+@media(max-width:540px){
+ .track-actions{flex-wrap:nowrap;margin-bottom:8px}
+ .track-actions #add-track{width:auto}
+ .workspace-open .band-minimized .track-actions{flex-shrink:0;margin:0;gap:4px}
+}
+
+/* Keep the composition heading and its controls on one scrollable row. */
+#editor .edit-toolbar{flex-wrap:nowrap;gap:8px;overflow-x:auto;padding:4px 3px 8px}
+#editor .edit-toolbar>*{flex-shrink:0;white-space:nowrap}
+#editor .edit-toolbar>strong{margin:0 8px 0 0;font-size:14px}
+#editor #focus-score{width:32px;height:32px;padding:6px;flex-shrink:0}
+.track-actions{margin-top:8px}
+
+/* One persistent home for score display controls. */
+.view-menu{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;flex-shrink:0;padding:8px 0;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.view-menu .view-controls{flex-shrink:0}
+.workspace-open .view-menu .zoom-controls{display:flex;margin:0;gap:7px}
+.view-menu #focus-score{width:32px;height:32px;padding:6px;flex-shrink:0}
+@media(max-width:800px){
+ .view-menu{justify-content:flex-start;gap:8px}
+ .view-menu .zoom-controls input{width:80px}
+}
