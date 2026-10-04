@@ -107,6 +107,14 @@ test('editing preserves variable bars, fractional timing, repeats, effects and t
   assert.deepEqual(midi(triplets),midi(saved));
   const restored=JSON.parse(JSON.stringify(editing));
   assert.deepEqual(await parse(await createTbt(restored),'imported.tbt'),triplets);
+  restored.tracks[0].changes[0].value=210;
+  restored.tracks[1].changes.push({space:18,start:3,effect:3,value:90});
+  const changed=await parse(await createTbt(restored));
+  assert.equal(changed.tracks[0].changes[0].value,210);
+  assert.deepEqual(changed.tracks[1].changes,[{space:18,start:3,effect:3,value:90}]);
+  restored.tracks[0].changes=[];
+  assert.deepEqual((await parse(await createTbt(restored))).tracks[0].changes,[]);
+
 });
 
 test('triplet timing round trips through TBT, browser restore and MIDI',async()=>{

@@ -95,6 +95,27 @@ function timingBytes(track) {
   }
   return runs(raw);
 }
+function writeLegacyTempos(raw,track){
+  for(let p=0;p<raw.length/20;p++)if([84,116].includes(raw[p*20+16]))raw.fill(0,p*20+16,p*20+20);
+  for(const c of track.changes??[])if(c.effect===3){
+    const space=integer(c.space,0,raw.length/20-1,'Tempo position'),value=integer(c.value,30,500,'Tempo change');
+    if(raw[space*20+16])throw Error('A different effect already occupies this tempo position.');
+    raw[space*20+16]=value>255?116:84;raw[space*20+19]=value>255?value-250:value;
+  }
+}
+function replaceModernTempos(suffix,header,tracks){
+  const reader=new Reader(Uint8Array.from(suffix)),timing=[];
+  if(header[11]&16)for(const track of tracks){const start=reader.pos;reader.runs(track.grid[0].length*2);timing.push(reader.data.subarray(start,reader.pos));}
+  const blocks=tracks.map(track=>{
+    const block=new Reader(reader.read(reader.num(4))),records=[];let space=0;
+    while(block.pos<block.data.length){space+=block.num(2);const bytes=block.read(6);if(bytes[0]!==3||bytes[1]!==0)records.push({space,bytes});}
+    for(const c of track.changes??[])if(c.effect===3)records.push({space:integer(c.space,0,track.grid[0].length-1,'Tempo position'),bytes:concat(number(3,2),number(0,2),number(integer(c.value,30,500,'Tempo change'),2))});
+    records.sort((a,b)=>a.space-b.space);let previous=0;
+    const bytes=concat(...records.map(r=>{const delta=r.space-previous;previous=r.space;return concat(number(delta,2),r.bytes);}));
+    return concat(number(bytes.length,4),bytes);
+  });
+  return concat(...timing,...blocks,reader.read(reader.data.length-reader.pos));
+}
 async function createImportedTbt(draft){
   const {encoding,tracks}=draft;
   const header=Uint8Array.from(encoding.header);let meta=Uint8Array.from(encoding.metadata);
@@ -117,6 +138,7 @@ async function createImportedTbt(draft){
     }else tracks.forEach((track,i)=>meta.set(number(track.grid[0].length,4),i*4));
     header[11]|=16;
   }
+  if(header[3]>=0x71)suffix=replaceModernTempos(suffix,header,tracks);
   const tempo=integer(draft.tempo,30,500,'Tempo');
   if(tracks.length!==header[5])throw Error('Imported track count changed');
   const raw=tracks.map((track,i)=>{
@@ -136,6 +158,7 @@ async function createImportedTbt(draft){
     // Store the effective tuning, folding the original transpose into each string.
     meta[encoding.transposeOffset+shift+i]=0;
     track.pitches.forEach((pitch,j)=>{meta[encoding.tuningOffset+shift+i*8+j]=(integer(pitch,0,127,'Open string pitch')-standard[j])&255;});
+    if(header[3]<=0x70)writeLegacyTempos(rows,track);
     return runs(rows);
   });
   const metadata=await compress(meta),body=concat(prefix,...raw,suffix);
@@ -158,7 +181,7 @@ export async function createTbt(draft){
     t.grid.forEach((row,string)=>{
       if(!Array.isArray(row)||row.length!==spaces)throw Error('Invalid measure length');
       row.forEach((fret,step)=>{if(fret!==null)raw[step*20+string]=fret==='x'?17:fret==='*'?18:128+integer(fret,0,99,'Fret / drum note');});
-    });return {...t,raw};
+    });writeLegacyTempos(raw,t);return {...t,raw};
   });
   const n=tracks.length, repeat=value=>Array(n).fill(value);
   const fields=[tracks.map(t=>t.pitches.length),tracks.map(t=>t.program),repeat(28),repeat(96),repeat(0),repeat(0),repeat(0),repeat(0),repeat(64),repeat(99),tracks.map(t=>+Boolean(t.drums)),tracks.map(t=>t.drums?9:255),repeat(0),repeat(0)];

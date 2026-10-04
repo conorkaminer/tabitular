@@ -40,3 +40,5 @@ header #new-tab{margin-left:auto}header .button{margin-left:0}dialog{border:1px 
 #score.unified .system{flex-wrap:nowrap;gap:0;align-items:flex-start}
 #score.unified .measure{max-width:none;min-width:0}
 @media(max-width:800px){.score-options{align-items:flex-start}.score-track-label{font-size:11px}}
+.note-grid input[type=number]{width:32px;font-size:11px;appearance:textfield;-moz-appearance:textfield}
+.note-grid input[type=number]::-webkit-inner-spin-button,.note-grid input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}

@@ -75,6 +75,6 @@ export function gridColumns(draft,index,track,spacing) {
   const bar=measureGrid(draft,index),times=track.times??Array.from({length:track.grid[0].length+1},(_,i)=>i);
   return times.slice(0,-1).map((time,step)=>({time,step})).filter(({time,step})=>{
     const offset=time-bar.start,beat=offset/spacing;
-    return offset>=-1e-8&&offset<bar.length-1e-8&&(Math.abs(beat-Math.round(beat))<1e-8||track.grid.some(row=>row[step]!=null));
+    return offset>=-1e-8&&offset<bar.length-1e-8&&(Math.abs(beat-Math.round(beat))<1e-8||track.grid.some(row=>row[step]!=null)||draft.tracks.some(t=>(t.changes??[]).some(c=>c.effect===3&&Math.abs(c.start-time)<1e-8)));
   });
 }
