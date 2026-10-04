@@ -124,15 +124,15 @@ for(const event of ['beforeinput','change','click'])document.addEventListener(ev
   if(draft)history.context(historyState());
 },true);
 document.addEventListener('keydown',e=>{
-  if(!draft||e.altKey||!(e.metaKey||e.ctrlKey)||$('new-dialog').open)return;
+  if(!draft||e.isComposing||e.altKey||!(e.metaKey||e.ctrlKey)||$('new-dialog').open)return;
   const key=e.key.toLowerCase();
   const direction=key==='z'?(e.shiftKey?'redo':'undo'):key==='y'&&!e.shiftKey?'redo':null;
   if(!direction)return;
   const target=e.target;
   if(target.isContentEditable||target.closest('textarea')||
-    (target.tagName==='INPUT'&&!target.closest('#note-grid')&&target.id!=='tempo'))return;
+    (target.matches('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit])')&&!target.closest('#note-grid')&&target.id!=='tempo'))return;
   e.preventDefault();restoreHistory(direction);
-});
+},true); // Run before controls that stop keyboard events from bubbling.
 function persistDraft(){
   if(!draft)return;
   if(!restoringHistory)history.record(historyState());
